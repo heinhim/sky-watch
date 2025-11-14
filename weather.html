@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Weather App</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        
+        /* Custom styles for background and transitions */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1f2937, #111827); /* Dark gradient background */
+            min-height: 100vh;
+        }
+
+        /* Utility class for weather icon backgrounds */
+        .weather-bg {
+            background: linear-gradient(45deg, #4f46e5, #7c3aed);
+        }
+
+        .weather-card {
+            transition: all 0.3s ease-in-out;
+        }
+        
+        /* Hide the loader initially */
+        #loading-indicator {
+            display: none;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+
+    <div class="w-full max-w-lg mx-auto p-6 bg-gray-800 rounded-xl shadow-2xl weather-card">
+        
+        <h1 class="text-3xl font-bold text-white mb-6 text-center">
+            SkyWatch
+        </h1>
+
+        <!-- Search Form -->
+        <form id="weather-form" class="flex flex-col sm:flex-row gap-3 mb-6">
+            <input 
+                type="text" 
+                id="city-input"
+                placeholder="Enter city name (e.g., London, Tokyo)"
+                class="flex-grow p-3 rounded-lg border-2 border-indigo-500 focus:border-indigo-400 focus:ring focus:ring-indigo-300 focus:ring-opacity-50 bg-gray-700 text-white placeholder-gray-400 outline-none"
+                required
+            >
+            <button 
+                type="submit" 
+                class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition duration-300 transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50"
+            >
+                Get Weather
+            </button>
+        </form>
+
+        <!-- Loading Indicator -->
+        <div id="loading-indicator" class="text-center py-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400 inline-block"></div>
+            <p class="text-indigo-400 mt-2">Fetching weather data...</p>
+        </div>
+
+        <!-- Error/Initial Message -->
+        <div id="message" class="text-center p-4 rounded-lg bg-red-800 bg-opacity-30 text-red-300 font-medium hidden">
+            <!-- Error message will be displayed here -->
+        </div>
+
+        <!-- Weather Results Container -->
+        <div id="weather-result" class="hidden">
+            
+            <!-- Main Weather Display -->
+            <div class="text-center p-8 mb-6 rounded-xl shadow-xl weather-bg">
+                <p class="text-4xl font-light text-indigo-200 mb-1" id="city-name"></p>
+                <div class="text-6xl font-extrabold text-white my-3">
+                    <span id="temperature"></span><sup class="text-3xl">&deg;C</sup>
+                </div>
+                <p class="text-xl font-medium text-indigo-100 mb-4" id="description"></p>
+                
+                <div class="flex justify-center gap-4 text-indigo-200">
+                    <div class="text-sm">High: <span id="temp-max"></span>&deg;C</div>
+                    <div class="text-sm">Low: <span id="temp-min"></span>&deg;C</div>
+                </div>
+            </div>
+
+            <!-- Detailed Metrics -->
+            <div class="grid grid-cols-2 gap-4 text-white">
+                
+                <div class="p-4 bg-gray-700 rounded-xl shadow-md flex items-center justify-between">
+                    <span class="text-gray-400">Humidity</span>
+                    <span id="humidity" class="text-xl font-bold"></span>
+                </div>
+
+                <div class="p-4 bg-gray-700 rounded-xl shadow-md flex items-center justify-between">
+                    <span class="text-gray-400">Wind Speed</span>
+                    <span id="wind-speed" class="text-xl font-bold"></span>
+                </div>
+
+                <div class="p-4 bg-gray-700 rounded-xl shadow-md flex items-center justify-between col-span-2">
+                    <span class="text-gray-400">Atmosphere</span>
+                    <span id="pressure" class="text-xl font-bold"></span>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        const form = document.getElementById('weather-form');
+        const cityInput = document.getElementById('city-input');
+        const weatherResult = document.getElementById('weather-result');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const messageBox = document.getElementById('message');
+
+        // --- Mock Data Simulation for Immediate Runnability ---
+        // In a real application, you would use an external API like OpenWeatherMap.
+        const mockWeatherData = {
+            'london': { temp: 15, feels_like: 14, temp_min: 10, temp_max: 18, pressure: 1012, humidity: 75, wind_speed: 12, description: 'Overcast Clouds', icon: '04d' },
+            'tokyo': { temp: 24, feels_like: 25, temp_min: 20, temp_max: 28, pressure: 1008, humidity: 65, wind_speed: 8, description: 'Clear Sky', icon: '01d' },
+            'lagos': { temp: 30, feels_like: 32, temp_min: 27, temp_max: 33, pressure: 1010, humidity: 80, wind_speed: 15, description: 'Scattered Showers', icon: '09d' },
+            'new york': { temp: 8, feels_like: 5, temp_min: 5, temp_max: 10, pressure: 1015, humidity: 50, wind_speed: 20, description: 'Light Snow', icon: '13d' },
+        };
+        
+        /**
+         * Simulates an API call to fetch weather data.
+         * REPLACE THIS FUNCTION with your actual API call in a production environment.
+         * * @param {string} city - The name of the city.
+         * @returns {Promise<object>} - A promise that resolves with weather data.
+         */
+        const fetchWeather = async (city) => {
+            messageBox.classList.add('hidden');
+            loadingIndicator.style.display = 'block';
+
+            // Simulate network delay
+            await new Promise(resolve => setTimeout(resolve, 1500)); 
+            
+            loadingIndicator.style.display = 'none';
+
+            const normalizedCity = city.toLowerCase().trim();
+
+            if (mockWeatherData[normalizedCity]) {
+                return { 
+                    name: city, 
+                    main: { 
+                        temp: mockWeatherData[normalizedCity].temp, 
+                        temp_min: mockWeatherData[normalizedCity].temp_min, 
+                        temp_max: mockWeatherData[normalizedCity].temp_max,
+                        pressure: mockWeatherData[normalizedCity].pressure,
+                        humidity: mockWeatherData[normalizedCity].humidity,
+                    },
+                    wind: { speed: mockWeatherData[normalizedCity].wind_speed },
+                    weather: [{ 
+                        description: mockWeatherData[normalizedCity].description,
+                        icon: mockWeatherData[normalizedCity].icon 
+                    }]
+                };
+            } else {
+                // Simulate a 404/Not Found error
+                throw new Error(`Weather data for "${city}" not found in our mock database.`);
+            }
+
+            /* // REAL API INTEGRATION EXAMPLE (e.g., OpenWeatherMap)
+            const apiKey = 'YOUR_OPENWEATHERMAP_API_KEY'; // <<< GET YOUR OWN KEY HERE
+            const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`;
+
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                // Handles 404 (City Not Found) or other API errors
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Could not fetch weather data for ${city}.`);
+            }
+            return await response.json();
+            */
+        };
+
+        /**
+         * Renders the fetched weather data to the UI.
+         * @param {object} data - The weather data object.
+         */
+        const renderWeather = (data) => {
+            const temp = Math.round(data.main.temp);
+            const tempMin = Math.round(data.main.temp_min);
+            const tempMax = Math.round(data.main.temp_max);
+            const description = data.weather[0].description.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+            document.getElementById('city-name').textContent = data.name;
+            document.getElementById('temperature').textContent = temp;
+            document.getElementById('description').textContent = description;
+            document.getElementById('temp-min').textContent = tempMin;
+            document.getElementById('temp-max').textContent = tempMax;
+            document.getElementById('humidity').textContent = `${data.main.humidity}%`;
+            document.getElementById('wind-speed').textContent = `${(data.wind.speed * 3.6).toFixed(1)} km/h`; // Convert m/s to km/h
+            document.getElementById('pressure').textContent = `${data.main.pressure} hPa`;
+
+            weatherResult.classList.remove('hidden');
+            messageBox.classList.add('hidden');
+        };
+
+        /**
+         * Displays an error message in the UI.
+         * @param {string} msg - The error message.
+         */
+        const displayError = (msg) => {
+            messageBox.textContent = `Error: ${msg}`;
+            messageBox.classList.remove('hidden');
+            weatherResult.classList.add('hidden');
+        };
+
+        // Event Listener for Form Submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const city = cityInput.value.trim();
+            if (!city) return;
+
+            try {
+                const weatherData = await fetchWeather(city);
+                renderWeather(weatherData);
+            } catch (error) {
+                console.error("Weather fetching error:", error.message);
+                displayError(error.message);
+            }
+        });
+        
+        // Initial Message on Load
+        window.onload = () => {
+             messageBox.textContent = 'Enter a city and press "Get Weather" to begin. Try London, Tokyo, or Lagos!';
+             messageBox.classList.remove('hidden');
+             messageBox.classList.replace('bg-red-800', 'bg-indigo-800');
+             messageBox.classList.replace('text-red-300', 'text-indigo-300');
+        };
+
+    </script>
+
+</body>
+</html>
